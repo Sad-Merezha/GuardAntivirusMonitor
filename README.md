@@ -6,28 +6,28 @@
 A simple Windows Task Manager and antivirus scanner with graphical interface.
 
 ### 🌟 Features:
-* Shows all open programs and their ID numbers (PIDs).
-* Checks running files for viruses using MD5 hashes.
-* Has a "SCAN FILE" button to choose and check any file on your computer.
-* Has a live search bar to find programs quickly.
-* Has a red button to stop and close any selected program.
+* Shows all opened processes and their ID numbers (PIDs)
+* Checks all processes for viruses using MD5 hashes
+* Has a "SCAN FILE" button to choose and check any file 
+* Has a live search bar to find process what you need
+* Has a "KILL PROCESS" button to stop any process
 
 ### 🛠️ Languages:
-* **C++** — works with the system and checks file hashes.
-* **Python** — creates the dark graphical window (CustomTkinter).
+* **C++** — works with the system and checks file hashes
+* **Python** — creates the graphical window 
 
 
 
 ## Русский
 
-Простой Диспетчер задач Windows и антивирусный сканер с графическим интерфейсом.
+Простой Диспетчер задач Windows и антивирусный сканер с графическим интерфейсом
 
 ### 🌟 Возможности:
-* Показывает все открытые программы и их номера (PID).
-* Проверяет запущенные файлы на вирусы через MD5-хэши.
-* Кнопка "SCAN FILE" позволяет выбрать и проверить любой файл на компьютере.
-* Есть строка поиска, чтобы быстро находить нужные программы.
-* Красная кнопка позволяет закрыть любую выбранную программу.
+* Показывает все процессы и их айди (PID)
+* Проверяет запущенные файлы на угроз через MD5-хэши 
+* Кнопка "SCAN FILE" сканирует выбранный файл на наличие вирусов
+* Есть строка поиска для нужных процессов
+* Красная кнопка для завершения процесса
 
 ### 🛠️ Языки:
 * **C++** — работает с системой и считает хэши файлов.

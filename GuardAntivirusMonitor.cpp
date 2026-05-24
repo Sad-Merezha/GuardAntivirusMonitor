@@ -1,9 +1,10 @@
-﻿#include <Windows.h>
+#include <Windows.h>
 #include <tlhelp32.h>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <wincrypt.h>
+#include <algorithm>
 
 #pragma comment(lib, "advapi32.lib")
 
@@ -71,6 +72,29 @@ bool check_virus(const std::wstring& hash) {
     return false;
 }
 
+bool heuristic_scan(const std::wstring& proc_name, const std::wstring& path) {
+    std::wstring lower_name = proc_name;
+    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::towlower);
+
+    if (lower_name == L"svch0st.exe" || lower_name == L"notepadd.exe" || lower_name == L"explorer simulation.exe") {
+        return true;
+    }
+
+    if (!path.empty()) {
+        std::wstring lower_path = path;
+        std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::towlower);
+
+        if (lower_path.find(L"\\appdata\\local\\temp\\") != std::wstring::npos) {
+            if (lower_name.find(L"patch") != std::wstring::npos || 
+                lower_name.find(L"crack") != std::wstring::npos || 
+                lower_name.find(L"cheat") != std::wstring::npos) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void save_to_file() {
     std::wofstream file("processes.txt");
     if (!file.is_open()) return;
@@ -85,12 +109,11 @@ void save_to_file() {
         do {
             std::wstring status = L"SAFE";
             std::wstring path = get_path(p32.th32ProcessID);
-            if (path.length() > 0) {
-                std::wstring h = make_md5(path);
-                if (check_virus(h) == true) {
-                    status = L"VIRUS";
-                }
+            
+            if (check_virus(make_md5(path)) == true || heuristic_scan(p32.szExeFile, path) == true) {
+                status = L"VIRUS";
             }
+            
             file << p32.th32ProcessID << L";" << p32.szExeFile << L";" << status << L"\n";
         } while (Process32Next(snp, &p32));
     }
@@ -128,10 +151,13 @@ int main(int argc, char* argv[]) {
         for (size_t i = 0; i < s_path.length(); ++i) {
             w_path += (wchar_t)s_path[i];
         }
-
+        
         std::wstring h = make_md5(w_path);
+        wchar_t name_buf[MAX_PATH];
+        _wsplitpath_s(w_path.c_str(), NULL, 0, NULL, 0, name_buf, MAX_PATH, NULL, 0);
+        
         if (h.length() == 0) return 404;
-        if (check_virus(h) == true) return 666;
+        if (check_virus(h) == true || heuristic_scan(name_buf, w_path) == true) return 666;
         return 200;
     }
 

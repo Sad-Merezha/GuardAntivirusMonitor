@@ -3,10 +3,10 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <wincrypt.h>
+#include <bcrypt.h>
 #include <algorithm>
 
-#pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "bcrypt.lib")
 
 std::wstring get_path(DWORD pid) {
     std::wstring path = L"";
@@ -22,38 +22,45 @@ std::wstring get_path(DWORD pid) {
     return path;
 }
 
-std::wstring make_md5(const std::wstring& path_to_file) {
+std::wstring make_sha256(const std::wstring& path_to_file) {
     std::wstring hash_string = L"";
-    HANDLE hFile = CreateFileW(path_to_file.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(path_to_file.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return hash_string;
 
-    HCRYPTPROV prov = 0;
-    HCRYPTHASH hash = 0;
-    if (CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
-        if (CryptCreateHash(prov, CALG_MD5, 0, 0, &hash)) {
-            BYTE buf[1024];
-            DWORD reading = 0;
-            bool ok = true;
-            while (ReadFile(hFile, buf, sizeof(buf), &reading, NULL) && reading > 0) {
-                if (!CryptHashData(hash, buf, reading, 0)) {
-                    ok = false;
-                    break;
-                }
-            }
-            if (ok) {
-                BYTE h_res[16];
-                DWORD h_len = 16;
-                if (CryptGetHashParam(hash, HP_HASHVAL, h_res, &h_len, 0)) {
-                    wchar_t key[33];
-                    for (int i = 0; i < 16; ++i) {
-                        swprintf_s(&key[i * 2], 3, L"%02x", h_res[i]);
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+    BCRYPT_HASH_HANDLE hHash = NULL;
+    
+    if (BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0) == 0) {
+        DWORD cbHashObject = 0;
+        DWORD cbData = 0;
+        
+        if (BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PBYTE)&cbHashObject, sizeof(DWORD), &cbData, 0) == 0) {
+            std::vector<BYTE> hashObject(cbHashObject);
+            
+            if (BCryptCreateHash(hAlg, &hHash, hashObject.data(), cbHashObject, NULL, 0, 0) == 0) {
+                BYTE buf[4096];
+                DWORD reading = 0;
+                bool ok = true;
+                while (ReadFile(hFile, buf, sizeof(buf), &reading, NULL) && reading > 0) {
+                    if (BCryptHashData(hHash, buf, reading, 0) != 0) {
+                        ok = false;
+                        break;
                     }
-                    hash_string = key;
                 }
+                if (ok) {
+                    BYTE h_res[32]; 
+                    if (BCryptFinishHash(hHash, h_res, sizeof(h_res), 0) == 0) {
+                        wchar_t key[65];
+                        for (int i = 0; i < 32; ++i) {
+                            swprintf_s(&key[i * 2], 3, L"%02x", h_res[i]);
+                        }
+                        hash_string = key;
+                    }
+                }
+                BCryptDestroyHash(hHash);
             }
-            CryptDestroyHash(hash);
         }
-        CryptReleaseContext(prov, 0);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
     }
     CloseHandle(hFile);
     return hash_string;
@@ -61,8 +68,8 @@ std::wstring make_md5(const std::wstring& path_to_file) {
 
 bool check_virus(const std::wstring& hash) {
     std::vector<std::wstring> virus_base;
-    virus_base.push_back(L"44d88612fea8a8f36de82e1278abb02f");
-    virus_base.push_back(L"3a52ce780950d4d969792a2559cd935a");
+    virus_base.push_back(L"eedfa3d702d73f4e1f74805e26b15e45a2789f663488f21bc9e4726ef6dfb776");
+    virus_base.push_back(L"55d3122c153ff229b4e3415c8df1211bc048af3291244e8bc12a52cf12cf412f");
 
     for (size_t i = 0; i < virus_base.size(); ++i) {
         if (virus_base[i] == hash) {
@@ -80,7 +87,7 @@ bool heuristic_scan(const std::wstring& proc_name, const std::wstring& path) {
         return true;
     }
 
-    if (!path.empty()) {
+    if (path.length() > 0) {
         std::wstring lower_path = path;
         std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::towlower);
 
@@ -110,7 +117,7 @@ void save_to_file() {
             std::wstring status = L"SAFE";
             std::wstring path = get_path(p32.th32ProcessID);
             
-            if (check_virus(make_md5(path)) == true || heuristic_scan(p32.szExeFile, path) == true) {
+            if (check_virus(make_sha256(path)) == true || heuristic_scan(p32.szExeFile, path) == true) {
                 status = L"VIRUS";
             }
             
@@ -147,17 +154,21 @@ int main(int argc, char* argv[]) {
 
     if (argc == 3 && flag == "--check") {
         std::string s_path = argv[2];
-        std::wstring w_path = L"";
-        for (size_t i = 0; i < s_path.length(); ++i) {
-            w_path += (wchar_t)s_path[i];
-        }
         
-        std::wstring h = make_md5(w_path);
+        int len = MultiByteToWideChar(CP_UTF8, 0, s_path.c_str(), (int)s_path.length(), NULL, 0);
+        std::wstring w_path(len, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, s_path.c_str(), (int)s_path.length(), w_path.data(), len);
+        
+        std::wstring h = make_sha256(w_path);
+        
         wchar_t name_buf[MAX_PATH];
-        _wsplitpath_s(w_path.c_str(), NULL, 0, NULL, 0, name_buf, MAX_PATH, NULL, 0);
+        wchar_t ext_buf[MAX_PATH];
+        _wsplitpath_s(w_path.c_str(), NULL, 0, NULL, 0, name_buf, MAX_PATH, ext_buf, MAX_PATH);
         
-        if (h.length() == 0) return 404;
-        if (check_virus(h) == true || heuristic_scan(name_buf, w_path) == true) return 666;
+        std::wstring full_name = std::wstring(name_buf) + std::wstring(ext_buf);
+        
+        if (h.length() == 0 && full_name.empty()) return 404;
+        if (check_virus(h) == true || heuristic_scan(full_name, w_path) == true) return 666;
         return 200;
     }
 

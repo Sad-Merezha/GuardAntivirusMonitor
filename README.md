@@ -7,7 +7,7 @@ A simple Windows Task Manager and antivirus scanner with graphical interface.
 
 ### 🌟 Features:
 * Shows all opened processes and their ID numbers (PIDs)
-* Checks all processes for viruses using MD5 hashes
+* Checks all processes for viruses 
 * Has a "SCAN FILE" button to choose and check any file 
 * Has a live search bar to find process what you need
 * Has a "KILL PROCESS" button to stop any process
@@ -24,7 +24,7 @@ A simple Windows Task Manager and antivirus scanner with graphical interface.
 
 ### 🌟 Возможности:
 * Показывает все процессы и их айди (PID)
-* Проверяет запущенные файлы на угроз через MD5-хэши 
+* Проверяет запущенные файлы на угроз 
 * Кнопка "SCAN FILE" сканирует выбранный файл на наличие вирусов
 * Есть строка поиска для нужных процессов
 * Красная кнопка для завершения процесса
